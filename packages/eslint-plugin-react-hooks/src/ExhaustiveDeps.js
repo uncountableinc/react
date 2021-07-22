@@ -1672,7 +1672,12 @@ function getNodeWithoutReactNamespace(node, options) {
 // 1 for useImperativeHandle(ref, fn).
 // For additionally configured Hooks, assume that they're like useEffect (0).
 function getReactiveHookCallbackIndex(calleeNode, options) {
-  const node = getNodeWithoutReactNamespace(calleeNode);
+  let node = getNodeWithoutReactNamespace(calleeNode);
+  
+  if (node.type === 'MemberExpression' && node.property && node.property.type === 'Identifier') {
+    node = node.property;
+  }
+
   if (node.type !== 'Identifier') {
     return -1;
   }
