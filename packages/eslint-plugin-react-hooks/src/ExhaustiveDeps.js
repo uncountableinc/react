@@ -29,6 +29,9 @@ export default {
           additionalHooks: {
             type: 'string',
           },
+          additionalNamespaces: {
+            type: 'string',
+          },
           enableDangerousAutofixThisMayCauseInfiniteLoops: {
             type: 'boolean',
           },
@@ -37,12 +40,19 @@ export default {
     ],
   },
   create(context) {
-    // Parse the `additionalHooks` regex.
+    // Parse the `additionalHooks` and `additionalNamespaces` regexes.
     const additionalHooks =
       context.options &&
       context.options[0] &&
       context.options[0].additionalHooks
         ? new RegExp(context.options[0].additionalHooks)
+        : undefined;
+
+    const additionalNamespaces =
+      context.options &&
+      context.options[0] &&
+      context.options[0].additionalNamespaces
+        ? new RegExp(context.options[0].additionalNamespaces)
         : undefined;
 
     const enableDangerousAutofixThisMayCauseInfiniteLoops =
@@ -53,6 +63,7 @@ export default {
 
     const options = {
       additionalHooks,
+      additionalNamespaces,
       enableDangerousAutofixThisMayCauseInfiniteLoops,
     };
 
@@ -1119,7 +1130,7 @@ export default {
       }
       const callback = node.arguments[callbackIndex];
       const reactiveHook = node.callee;
-      const reactiveHookName = getNodeWithoutReactNamespace(reactiveHook).name;
+      const reactiveHookName = getNodeWithoutNamespace(reactiveHook, options).name;
       const declaredDependenciesNode = node.arguments[callbackIndex + 1];
       const isEffect = /Effect($|[^a-z])/g.test(reactiveHookName);
 
@@ -1675,11 +1686,14 @@ function analyzePropertyChain(node, optionalChains) {
   }
 }
 
-function getNodeWithoutReactNamespace(node, options) {
+function getNodeWithoutNamespace(node, options) {
   if (
     node.type === 'MemberExpression' &&
     node.object.type === 'Identifier' &&
-    node.object.name === 'React' &&
+    (
+      node.object.name === 'React' ||
+      (options.additionalNamespaces && options.additionalNamespaces.test(node.object.name))
+    ) &&
     node.property.type === 'Identifier' &&
     !node.computed
   ) {
@@ -1694,7 +1708,7 @@ function getNodeWithoutReactNamespace(node, options) {
 // 1 for useImperativeHandle(ref, fn).
 // For additionally configured Hooks, assume that they're like useEffect (0).
 function getReactiveHookCallbackIndex(calleeNode, options) {
-  const node = getNodeWithoutReactNamespace(calleeNode);
+  const node = getNodeWithoutNamespace(calleeNode, options);
   if (node.type !== 'Identifier') {
     return -1;
   }
